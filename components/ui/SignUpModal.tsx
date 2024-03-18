@@ -16,61 +16,88 @@ const SignUpModal = (props: SignUpModalProps) => {
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [phoneNumber, setPhoneNumber] = useState('');
     const [disableSubmit, setDisableSubmit] = useState(true);
+    const [signUpOption, setSignUpOption] = useState<'email' | 'phoneNumber' | null>(null);
     const isLoading = useIsLoginWithEmailLoading();
 
     useEffect(() => {
-        if (isEmail(email) && password.length >= 6) {
+        if ((isEmail(email) && signUpOption === 'email' || phoneNumber.length > 0 && signUpOption === 'phoneNumber') && password.length >= 6) {
             setDisableSubmit(false);
         } else {
             setDisableSubmit(true);
         }
-    }, [email, password]);
+    }, [email, password, phoneNumber, signUpOption]);
 
-    // Signup with email and password and redirecting to home page
     const signUpWithEmail = useCallback(async () => {
-        // verify the user email before signup
         dispatch(
             loginWithEmail({
                 type: 'sign-up',
                 email,
                 password,
+                phoneNumber,
             })
         );
+    }, [email, password, phoneNumber, dispatch]);
 
-        /* if (credentials.user.emailVerified === false) {
-                await sendEmailVerification(credentials.user);
+    const signUpWithPhoneNumber = useCallback(() => {
+        // Logic to sign up with phone number
+    }, [phoneNumber]);
 
-                dispatch(
-                    showToast({
-                        message: 'Verification Email has been sent to your Email',
-                        type: 'success',
-                    })
-                );
-            } */
-
-        /* eslint-disable-next-line react-hooks/exhaustive-deps */
-    }, [email, password, dispatch]);
+    const handleOptionSelect = (option: 'email' | 'phoneNumber') => {
+        setSignUpOption(option);
+    };
 
     return (
         <Modal show={props.open} setShow={props.setOpen}>
             <div className="max-w-md w-full bg-white py-6 rounded-lg">
                 <h2 className="text-lg font-semibold text-center mb-10">Sign Up</h2>
                 <div className="px-4 flex p-4 pb-10 gap-4 flex-col">
-                    <Input
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="Email"
-                        name="email"
-                        type="text"
-                    />
-                    <Input
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Password"
-                        name="password"
-                        type="password"
-                    />
+                    <div className="grid grid-cols-1 gap-3">
+                        <LoadingButton onClick={() => handleOptionSelect('email')}>
+                            Sign Up with Email
+                        </LoadingButton>
+                        {signUpOption === 'email' && (
+                            <>
+                                <Input
+                                    value={email}
+                                    onChange={(e) => {setEmail(e.target.value), setPhoneNumber("")}}
+                                    placeholder="Email"
+                                    name="email"
+                                    type="text"
+                                />
+                                <Input
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder="Password"
+                                    name="password"
+                                    type="password"
+                                />
+                            </>
+                        )}
+                        <LoadingButton onClick={() => handleOptionSelect('phoneNumber')}>
+                            Sign Up with Phone Number
+                        </LoadingButton>
+                        {signUpOption === 'phoneNumber' && (
+                            <>
+                                <Input
+                                    value={phoneNumber}
+                                    onChange={(e) => {setPhoneNumber(e.target.value); setEmail("");}}
+                                    placeholder="Phone Number"
+                                    name="phoneNumber"
+                                    type="text"
+                                />
+                                <Input
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder="Password"
+                                    name="password"
+                                    type="password"
+                                />
+                                <div id="recaptcha-container" />
+                            </>
+                        )}
+                    </div>
                     <LoadingButton
                         onClick={signUpWithEmail}
                         disabled={disableSubmit}

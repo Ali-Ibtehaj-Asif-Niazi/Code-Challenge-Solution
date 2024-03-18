@@ -22,6 +22,7 @@ const LoginPage: NextPage = () => {
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [phoneNumber, setphoneNumber] = useState('');
     const [disableSubmit, setDisableSubmit] = useState(true);
     const isLoading = useIsLoginWithEmailLoading();
 
@@ -44,6 +45,7 @@ const LoginPage: NextPage = () => {
                 type: 'login',
                 email,
                 password,
+                phoneNumber,
             })
         );
     }, [email, password, dispatch]);
