@@ -6,6 +6,10 @@ import LoginWithGoogleButton from './LoginWithGoogleButton';
 import Input from './Input';
 import { isEmail } from 'validator';
 import { loginWithEmail, useIsLoginWithEmailLoading } from '../redux/auth/loginWithEmail';
+import { showToast } from '@/components/redux/toast/toastSlice';
+import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
+import { firebaseAuth } from '@/components/firebase/firebaseAuth';
+import { useRouter } from 'next/navigation';
 
 interface SignUpModalProps {
     open: boolean;
@@ -13,6 +17,7 @@ interface SignUpModalProps {
 }
 const SignUpModal = (props: SignUpModalProps) => {
     const dispatch = useAppDispatch();
+    const auth = getAuth();
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -20,29 +25,68 @@ const SignUpModal = (props: SignUpModalProps) => {
     const [disableSubmit, setDisableSubmit] = useState(true);
     const [signUpOption, setSignUpOption] = useState<'email' | 'phoneNumber' | null>(null);
     const isLoading = useIsLoginWithEmailLoading();
+    const [recaptchaResolved, setRecaptchaResolved] = useState(false);
+    const [recaptchaVerifier, setRecaptchaVerifier] = useState<RecaptchaVerifier | null>(null);
+    const router = useRouter();
 
     useEffect(() => {
-        if ((isEmail(email) && signUpOption === 'email' || phoneNumber.length > 0 && signUpOption === 'phoneNumber') && password.length >= 6) {
+        if (isEmail(email) && signUpOption === 'email' && password.length >= 6|| phoneNumber.length > 0 && signUpOption === 'phoneNumber') {
             setDisableSubmit(false);
         } else {
             setDisableSubmit(true);
         }
     }, [email, password, phoneNumber, signUpOption]);
 
+    useEffect(() => {
+        if (signUpOption === 'phoneNumber') {
+            // Initialize reCAPTCHA verifier
+            const verifier = new RecaptchaVerifier(firebaseAuth, 'recaptcha-container', {
+                size: 'normal',
+           callback: () => {
+                setRecaptchaResolved(true);
+            },
+
+            'expired-callback': () => {
+                setRecaptchaResolved(false);
+                dispatch(
+                    showToast({
+                        message: 'Recaptcha Expired, please verify it again',
+                        type: 'info',
+                    })
+                );
+            },
+        });
+
+        verifier.render();
+
+        setRecaptchaVerifier(verifier);
+        }
+    }, [signUpOption]);
+
     const signUpWithEmail = useCallback(async () => {
         dispatch(
             loginWithEmail({
                 type: 'sign-up',
                 email,
-                password,
-                phoneNumber,
+                password
             })
         );
     }, [email, password, phoneNumber, dispatch]);
 
-    const signUpWithPhoneNumber = useCallback(() => {
-        // Logic to sign up with phone number
-    }, [phoneNumber]);
+    const signUpWithPhoneNumber = useCallback(async () => {
+        try {
+            const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier!);
+            const otpCode = prompt('Enter the OTP code sent to your phone:');
+            if (otpCode) {
+                const credential = await confirmationResult.confirm(otpCode);
+                console.log('Phone number authentication successful:', credential.user);
+            } else {
+                console.error('No OTP code entered.');
+            }
+        } catch (error) {
+            console.error('Error signing in with phone number:', error);
+        }
+    }, [phoneNumber, recaptchaVerifier]);
 
     const handleOptionSelect = (option: 'email' | 'phoneNumber') => {
         setSignUpOption(option);
@@ -73,6 +117,13 @@ const SignUpModal = (props: SignUpModalProps) => {
                                     name="password"
                                     type="password"
                                 />
+                                <LoadingButton
+                                    onClick={signUpWithEmail}
+                                    disabled={disableSubmit}
+                                    loading={isLoading}
+                                >
+                                    Sign Up
+                                </LoadingButton>
                             </>
                         )}
                         <LoadingButton onClick={() => handleOptionSelect('phoneNumber')}>
@@ -87,24 +138,25 @@ const SignUpModal = (props: SignUpModalProps) => {
                                     name="phoneNumber"
                                     type="text"
                                 />
-                                <Input
+                                {/* <Input
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     placeholder="Password"
                                     name="password"
                                     type="password"
-                                />
+                                /> */}
                                 <div id="recaptcha-container" />
+                                <LoadingButton
+                                    onClick={signUpWithPhoneNumber}
+                                    disabled={disableSubmit || !recaptchaVerifier}
+                                    loading={isLoading}
+                                >
+                                    Sign Up
+                                </LoadingButton>
+                                
                             </>
                         )}
                     </div>
-                    <LoadingButton
-                        onClick={signUpWithEmail}
-                        disabled={disableSubmit}
-                        loading={isLoading}
-                    >
-                        Sign Up
-                    </LoadingButton>
                     <div className="relative">
                         <div className="absolute inset-0 flex items-center">
                             <div className="w-full border-t border-gray-300" />
